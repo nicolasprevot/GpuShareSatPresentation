@@ -1,0 +1,108 @@
+\documentclass{beamer}
+\usepackage{tikz}
+
+
+
+\usetheme{Boadilla}
+\title{Leveraging GPUs for Effective Clause Sharing in Parallel SAT Solving}
+\author{Nicolas Prevot, Mate Soos, and Kuldeep S. Meel}
+\date{\today}
+
+\begin{document}
+\begin{frame}
+\titlepage
+\end{frame}
+
+\begin{frame}
+\frametitle{Outline}
+\tableofcontents
+\end{frame}
+
+\begin{frame}
+\frametitle{Outline}
+\tableofcontents
+\end{frame}
+
+\begin{frame}
+\frametitle{Parallel SAT solving approaches}
+\begin{itemize}
+\item Divide and conquer
+\begin{itemize}
+\item Separate the search spaces between threads
+\end{itemize}
+\item Portfolio approach
+\begin{itemize}
+\item Different parameters for different threads
+\item Threads share some clauses
+\item This is our approach
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Clause exchange}
+\begin{itemize}
+\item Sharing too many clauses leads to a slowdown
+\item We need to identify good clause and only share those
+\item Clauses with a small size/lbd are better
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Our approach}
+\begin{itemize}
+\item We can measure a clause usefulness by how often it is used
+\item Clauses that have been used are more likely to be used again
+\item => Identify clauses which would have been used recently, import those
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Identifying clauses which would have been used}
+\begin{itemize}
+\item SAT solvers perform propagation until completion, or they reach a conflict
+\item Consider assignments where unit propagation completed without conflict
+\item Indentify clauses which would have been used on those (in conflict or implying)
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Example of used clauses}
+\begin{itemize}
+\item Thread completes propagation with: $v_1 \leftarrow F, v_2 \leftarrow F$
+\begin{itemize}
+\item Clause $v_1 \lor v_2 \lor v_3$ would have implied $ v_3 \leftarrow T$
+\item Clause $v_1 \lor v_2$ would have been in conflict
+\item Clause $\neg v_1 \lor v_2$ would not have told us anything new
+\end{itemize}
+\item We say a clause triggers an assignment if it would have implied something or been in conflict
+\end{itemize}
+\end{frame}
+
+%\begin{frame}
+%
+%\begin{figure}
+%	\begin{tikzpicture}[node distance=0.1cm, auto]
+%	\node (Dummy){};
+%	\node[punkt, above = 1em of Dummy] (CPUThread1) {CPU thread 1};
+%	\node[punkt, below = 1em of Dummy] (CPUThread2) {CPU thread N};
+%	\node[bigPunkt, right = 1em of Dummy] (MasterThread) {{\GPUThread}};
+%	\node[bigPunkt, right = 1em of  MasterThread] (GPU) {GPU};
+%	\draw [pil, bend right=45, midway, right] (MasterThread) edge node{Reported clauses} (CPUThread1);
+%	\draw [pil, midway, right] (CPUThread1) edge node{Learned clauses} ({MasterThread});
+%	\draw [pil, bend right=35, midway, left] (CPUThread1) edge node{Assignments} (MasterThread);
+%	\draw [pil, bend left=35, midway, left] (CPUThread2) edge node{Assignments} (MasterThread);
+%	\draw [pil, midway, right] (CPUThread2) edge node{Learned clauses} (MasterThread);
+%	\draw [pil, bend left=45, midway, right] (MasterThread) edge node{Reported clauses} (CPUThread2);
+%	\draw [pil, bend right=45, midway, above] (GPU) edge node{Reported clause positions} (MasterThread);
+%	\draw [pil] (MasterThread) edge node{Learned clauses} (GPU);
+%	\draw [pil, bend right=45, midway, below] (MasterThread) edge node{Assignments} (GPU);
+%	\end{tikzpicture}
+%	\caption{Interactions between CPU threads and with the GPU}
+%	\label{fig:interaction}
+%\end{figure}
+%
+%\end{frame}
+
+\end{document}
+
