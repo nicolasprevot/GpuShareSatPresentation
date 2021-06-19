@@ -1,6 +1,51 @@
 \documentclass{beamer}
 \usepackage{tikz}
 
+\usepackage[latin1]{inputenc}
+
+% Makes new math operators
+\usepackage{microtype}  %This gives MUCH better PDF results!
+\usepackage{fnbreak} %warn for split footnotes
+\usepackage{booktabs} %nice tables
+\usepackage{tabularx}
+\usepackage{amsopn}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{pgf}
+\usepackage{tikz}
+\usepackage{url}
+\usepackage{comment}
+\usepackage{todonotes}
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+\usepackage{bm}
+\usepackage{url}
+\usepackage{hyperref}
+
+\usetikzlibrary{arrows,positioning}
+\tikzset{
+    >=stealth',
+    bigPunkt/.style={
+           rectangle,
+           rounded corners,
+           draw=black, very thick,
+           text width=6.5em,
+           minimum height=10em,
+           text centered},
+    punkt/.style={
+           rectangle,
+           rounded corners,
+           draw=black, very thick,
+           text width=6.5em,
+           minimum height=5em,
+           text centered},
+    pil/.style={
+           ->,
+           thick,
+           shorten <=2pt,
+           shorten >=2pt,}
+}
 
 
 \usetheme{Boadilla}
@@ -79,28 +124,65 @@
 \end{itemize}
 \end{frame}
 
+\begin{frame}
+\frametitle{Architecture}
+\begin{figure}[htb]
+	\centering
+\scalebox{0.64}{
+	\begin{tikzpicture}[node distance=1cm, auto]
+	\node (Dummy){};
+	\node[punkt, above = 10em of Dummy] (CPUThread1) {CPU thread 1};
+	\node[punkt, below = 10em of Dummy] (CPUThread2) {CPU thread N};
+	\node[bigPunkt, right = 10em of Dummy] (MasterThread) {Master Thread};
+	\node[bigPunkt, right = 10em of  MasterThread] (GPU) {GPU};
+	\draw [pil, bend right=45, midway, right] (MasterThread) edge node{Reported clauses} (CPUThread1);
+	\draw [pil, midway, right] (CPUThread1) edge node{Learned clauses} ({MasterThread});
+	\draw [pil, bend right=35, midway, left] (CPUThread1) edge node{Assignments} (MasterThread);
+	\draw [pil, bend left=35, midway, left] (CPUThread2) edge node{Assignments} (MasterThread);
+	\draw [pil, midway, right] (CPUThread2) edge node{Learned clauses} (MasterThread);
+	\draw [pil, bend left=45, midway, right] (MasterThread) edge node{Reported clauses} (CPUThread2);
+	\draw [pil, bend right=45, midway, above] (GPU) edge node{Reported clause positions} (MasterThread);
+	\draw [pil] (MasterThread) edge node{Learned clauses} (GPU);
+	\draw [pil, bend right=45, midway, below] (MasterThread) edge node{Assignments} (GPU);
+	\end{tikzpicture}
+}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{Bitwise representation of assignments}
+
+\begin{center}
+\begin{tabular}{ | c | c | c |}
+\hline
+ & $v_1$ & $v_2$ \\ 
+\hline
+assignment A & T & U \\  
+assignment B & U & F \\    
+\hline
+isSet & 10 & 01 \\
+isTrue & 10 & 00 \\
+\hline
+\end{tabular}
+\end{center}
+\end{frame}
+
 %\begin{frame}
+%\frametitle{Testing a clause on up to 32 assignments}
 %
-%\begin{figure}
-%	\begin{tikzpicture}[node distance=0.1cm, auto]
-%	\node (Dummy){};
-%	\node[punkt, above = 1em of Dummy] (CPUThread1) {CPU thread 1};
-%	\node[punkt, below = 1em of Dummy] (CPUThread2) {CPU thread N};
-%	\node[bigPunkt, right = 1em of Dummy] (MasterThread) {{\GPUThread}};
-%	\node[bigPunkt, right = 1em of  MasterThread] (GPU) {GPU};
-%	\draw [pil, bend right=45, midway, right] (MasterThread) edge node{Reported clauses} (CPUThread1);
-%	\draw [pil, midway, right] (CPUThread1) edge node{Learned clauses} ({MasterThread});
-%	\draw [pil, bend right=35, midway, left] (CPUThread1) edge node{Assignments} (MasterThread);
-%	\draw [pil, bend left=35, midway, left] (CPUThread2) edge node{Assignments} (MasterThread);
-%	\draw [pil, midway, right] (CPUThread2) edge node{Learned clauses} (MasterThread);
-%	\draw [pil, bend left=45, midway, right] (MasterThread) edge node{Reported clauses} (CPUThread2);
-%	\draw [pil, bend right=45, midway, above] (GPU) edge node{Reported clause positions} (MasterThread);
-%	\draw [pil] (MasterThread) edge node{Learned clauses} (GPU);
-%	\draw [pil, bend right=45, midway, below] (MasterThread) edge node{Assignments} (GPU);
-%	\end{tikzpicture}
-%	\caption{Interactions between CPU threads and with the GPU}
-%	\label{fig:interaction}
-%\end{figure}
+%\begin{algorithm}[htb]
+%\begin{algorithmic}[1]
+%    \State $\mathsf{allFalse} \gets [1,\cdots 1]$ \Comment{bit-vector of size $k$ with each bit initialized to 1}
+%    \State $\mathsf{oneUndef} \gets [0, \cdots, 0]$ \Comment{bit-vector of size $k$ with each bit initialized to 0}
+%    \For {$\ell \in \mathsf{cl}$}
+%        \State $\mathsf{oneUndef} \gets (\mathsf{allFalse} \& \isUndef(\bm{\mathcal{A}}(\ell))) \mid  (\mathsf{oneUndef} \& \isFalse(\bm{\mathcal{A}}(\ell)))$
+%        \State $\mathsf{allFalse} \gets \mathsf{allFalse} \& \isFalse(\bm{\mathcal{A}}(\ell))$
+%    \EndFor
+%    \State  $\mathsf{res} \gets \mathsf{oneUndef} \mid  \mathsf{allFalse}$
+%    \State \Return $\mathsf{res}$
+%\end{algorithmic}
+%\end{algorithm}
 %
 %\end{frame}
 
