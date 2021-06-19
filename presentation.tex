@@ -46,6 +46,13 @@
            shorten <=2pt,
            shorten >=2pt,}
 }
+\newcommand{\isFalse}{\ensuremath{\mathsf{isFalse}}}
+\newcommand{\isUndef}{\ensuremath{\mathsf{isUndef}}}
+\newcommand{\isTrue}{\ensuremath{\mathsf{isUndef}}}
+\newcommand{\isSet}{\ensuremath{\mathsf{isSet}}}
+\newcommand{\canBeTrue}{\ensuremath{\mathsf{canBeTrue}}}
+\newcommand{\canBeFalse}{\ensuremath{\mathsf{canBeFalse}}}
+\newcommand{\canBeUndef}{\ensuremath{\mathsf{canBeUndef}}}
 
 
 \usetheme{Boadilla}
@@ -56,16 +63,6 @@
 \begin{document}
 \begin{frame}
 \titlepage
-\end{frame}
-
-\begin{frame}
-\frametitle{Outline}
-\tableofcontents
-\end{frame}
-
-\begin{frame}
-\frametitle{Outline}
-\tableofcontents
 \end{frame}
 
 \begin{frame}
@@ -89,7 +86,8 @@
 \begin{itemize}
 \item Sharing too many clauses leads to a slowdown
 \item We need to identify good clause and only share those
-\item Clauses with a small size/lbd are better
+\item Clauses with a small size/lbd are usually better
+\item Some state-of-the-are solvers share only clauses with small size or lbd
 \end{itemize}
 \end{frame}
 
@@ -98,7 +96,7 @@
 \begin{itemize}
 \item We can measure a clause usefulness by how often it is used
 \item Clauses that have been used are more likely to be used again
-\item => Identify clauses which would have been used recently, import those
+\item Identify clauses which would have been used recently, import those
 \end{itemize}
 \end{frame}
 
@@ -168,23 +166,108 @@ isTrue & 10 & 00 \\
 \end{center}
 \end{frame}
 
-%\begin{frame}
-%\frametitle{Testing a clause on up to 32 assignments}
-%
-%\begin{algorithm}[htb]
-%\begin{algorithmic}[1]
-%    \State $\mathsf{allFalse} \gets [1,\cdots 1]$ \Comment{bit-vector of size $k$ with each bit initialized to 1}
-%    \State $\mathsf{oneUndef} \gets [0, \cdots, 0]$ \Comment{bit-vector of size $k$ with each bit initialized to 0}
-%    \For {$\ell \in \mathsf{cl}$}
-%        \State $\mathsf{oneUndef} \gets (\mathsf{allFalse} \& \isUndef(\bm{\mathcal{A}}(\ell))) \mid  (\mathsf{oneUndef} \& \isFalse(\bm{\mathcal{A}}(\ell)))$
-%        \State $\mathsf{allFalse} \gets \mathsf{allFalse} \& \isFalse(\bm{\mathcal{A}}(\ell))$
-%    \EndFor
-%    \State  $\mathsf{res} \gets \mathsf{oneUndef} \mid  \mathsf{allFalse}$
-%    \State \Return $\mathsf{res}$
-%\end{algorithmic}
-%\end{algorithm}
-%
-%\end{frame}
+\begin{frame}
+\frametitle{Testing a clause on 32 assignments}
+
+\begin{algorithm}[H]
+\begin{algorithmic}[1]
+    \State $\mathsf{allFalse} \gets [1,\cdots 1]$ \Comment{bit-vector of size $k$ with each bit initialized to 1}
+    \State $\mathsf{oneUndef} \gets [0, \cdots, 0]$ \Comment{bit-vector of size $k$ with each bit initialized to 0}
+    \For {$\ell \in \mathsf{cl}$}
+        \State $\mathsf{oneUndef} \gets (\mathsf{allFalse} \& \isUndef(\bm{\mathcal{A}}(\ell))) \mid  (\mathsf{oneUndef} \& \isFalse(\bm{\mathcal{A}}(\ell)))$
+        \State $\mathsf{allFalse} \gets \mathsf{allFalse} \& \isFalse(\bm{\mathcal{A}}(\ell))$
+    \EndFor
+    \State  $\mathsf{res} \gets \mathsf{oneUndef} \mid  \mathsf{allFalse}$
+    \State \Return $\mathsf{res}$
+\end{algorithmic}
+\end{algorithm}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{Group testing}
+\begin{itemize}
+\item Testing a clause on 32 assignments at once still isn't fast enough
+\item Group assignments by the solver thread they come from
+\item Test a clause on the groups first, only test it on individual assignments if it's positive
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Pooled assignment}
+\begin{center}
+\begin{tabular}{ | c | c | c | c |}
+\hline
+ & $v_1$ & $v_2$ & $v_3$\\ 
+\hline
+assignment A & T & F & U \\  
+assignment B & U & F & F \\    
+\hline
+pooled assignment & \{T, U \} & \{F\} & \{U, F\}\\
+\hline
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}
+\frametitle{Clause triggering a pooled assignment}
+\begin{definition}
+	A clause $\mathsf{cl}$ of size s triggers on an pooled assignment $P$ if both of the following conditions hold true:
+	\begin{enumerate}
+		\item For each literal $\ell$ in $\mathsf{cl}$, $P(\ell) \cap \{U,F\} \neq \emptyset$
+		\item For at least s - 1 literals $\ell \in \mathsf{cl}$, $F \in P(\ell)$
+	\end{enumerate}
+\end{definition}
+If a clause does not trigger on a pooled assignment, it does not trigger on any of the associated assignments
+\end{frame}
+
+\begin{frame}
+\frametitle{Bitwise representation of pooled assignments}
+\begin{center}
+\begin{tabular}{ | c | c | c |}
+\hline
+ & $v_1$ & $v_2$ \\ 
+\hline
+pooled assignment A & \{T, U\} & \{U\} \\  
+pooled assignment B & \{U\} & \{T, F, U\} \\    
+\hline
+canBeTrue & 10 & 01 \\
+canBeFalse & 00 & 01 \\
+canBeUndef & 11 & 11 \\
+\hline
+\end{tabular}
+\end{center}
+
+With this representation, we can test a clause on up to 32 pooled assignments at once.
+\end{frame}
+
+\begin{frame}
+\frametitle{overall clause testing}
+\includegraphics[width=\textwidth]{clauseTest.png}
+\end{frame}
+
+\begin{frame}
+\frametitle{Comparison with glucose-syrup}
+\begin{figure}[h]
+	\includegraphics[width=\textwidth]{cactusplot_syrup_vs_syrup_gpu}
+	\caption{glucose-syrup vs glucose-syrup + GpuShareSat. glucose-syrup solved 124 SAT and 127 UNSAT instances. glucose-syrup-gpu solved 132 SAT and 131 UNSAT instances.  }
+	\label{cactus:syrup}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Comparison with P-MCOMSPS-STR}
+\begin{figure}[htb]
+	\centering
+	\includegraphics[width=\textwidth]{cactusplot_painless_vs_relaxed_gpu}
+	\caption{P-MCOMSPS-STR vs Relaxed\_LCMDCBDL\_newTech + GpuShareSat}
+	\label{cactus:relaxed}
+\end{figure}
+\begin{itemize}
+\item P-MCOMSPS-STR came first in sat 2020 parallel competition
+\item Relaxed\_LCMDCBDL\_newTech came third in sat 2020 single threaded competition
+\end{itemize}
+\end{frame}
 
 \end{document}
 
