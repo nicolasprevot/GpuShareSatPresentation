@@ -86,15 +86,14 @@
 \begin{itemize}
 \item Sharing too many clauses leads to a slowdown
 \item We need to identify good clause and only share those
-\item Clauses with a small size/lbd are usually better
-\item Some state-of-the-are solvers share only clauses with small size or lbd
+\item Some state-of-the-art solvers share only clauses with small size or lbd
 \end{itemize}
 \end{frame}
 
 \begin{frame}
 \frametitle{Our approach}
 \begin{itemize}
-\item We can measure a clause usefulness by how often it is used
+\item Good clauses are used, in propagation or in conflict analysis
 \item Clauses that have been used are more likely to be used again
 \item Identify clauses which would have been used recently, import those
 \end{itemize}
@@ -112,7 +111,7 @@
 \begin{frame}
 \frametitle{Example of used clauses}
 \begin{itemize}
-\item Thread completes propagation with: $v_1 \leftarrow F, v_2 \leftarrow F$
+\item Assume thread completes propagation with: $v_1 \leftarrow F, v_2 \leftarrow F$
 \begin{itemize}
 \item Clause $v_1 \lor v_2 \lor v_3$ would have implied $ v_3 \leftarrow T$
 \item Clause $v_1 \lor v_2$ would have been in conflict
@@ -171,8 +170,8 @@ isTrue & 10 & 00 \\
 
 \begin{algorithm}[H]
 \begin{algorithmic}[1]
-    \State $\mathsf{allFalse} \gets [1,\cdots 1]$ \Comment{bit-vector of size $k$ with each bit initialized to 1}
-    \State $\mathsf{oneUndef} \gets [0, \cdots, 0]$ \Comment{bit-vector of size $k$ with each bit initialized to 0}
+    \State $\mathsf{allFalse} \gets [1,\cdots 1]$ \Comment{bit-vector of size $k$ with each bit initialised to 1}
+    \State $\mathsf{oneUndef} \gets [0, \cdots, 0]$ \Comment{bit-vector of size $k$ with each bit initialised to 0}
     \For {$\ell \in \mathsf{cl}$}
         \State $\mathsf{oneUndef} \gets (\mathsf{allFalse} \& \isUndef(\bm{\mathcal{A}}(\ell))) \mid  (\mathsf{oneUndef} \& \isFalse(\bm{\mathcal{A}}(\ell)))$
         \State $\mathsf{allFalse} \gets \mathsf{allFalse} \& \isFalse(\bm{\mathcal{A}}(\ell))$
@@ -244,6 +243,11 @@ With this representation, we can test a clause on up to 32 pooled assignments at
 \begin{frame}
 \frametitle{overall clause testing}
 \includegraphics[width=\textwidth]{clauseTest.png}
+\begin{itemize}
+\item Blue: positive tests
+\item Red: negative tests
+\item Grey: tests that did not need to be done
+\end{itemize}
 \end{frame}
 
 \begin{frame}
@@ -264,8 +268,8 @@ With this representation, we can test a clause on up to 32 pooled assignments at
 	\label{cactus:relaxed}
 \end{figure}
 \begin{itemize}
-\item P-MCOMSPS-STR came first in sat 2020 parallel competition
-\item Relaxed\_LCMDCBDL\_newTech came third in sat 2020 single threaded competition
+\item P-MCOMSPS-STR came first in SAT 2020 parallel competition
+\item Relaxed\_LCMDCBDL\_newTech came third in SAT 2020 single threaded competition
 \end{itemize}
 \end{frame}
 
