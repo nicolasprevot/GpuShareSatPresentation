@@ -57,7 +57,7 @@
 
 \usetheme{Boadilla}
 \title{Leveraging GPUs for Effective Clause Sharing in Parallel SAT Solving}
-\author{Nicolas Prevot, Mate Soos, and Kuldeep S. Meel}
+\author{Nicolas Prevot, Mate Soos, Kuldeep S. Meel}
 \date{\today}
 
 \begin{document}
@@ -66,58 +66,22 @@
 \end{frame}
 
 \begin{frame}
-\frametitle{Parallel SAT solving approaches}
+\frametitle{Overview}
 \begin{itemize}
-\item Divide and conquer
-\begin{itemize}
-\item Separate the search spaces between threads
-\end{itemize}
-\item Portfolio approach
-\begin{itemize}
-\item Different parameters for different threads
-\item Threads share some clauses
-\item This is our approach
-\end{itemize}
+\item GPUs are powerful, but it is not easy to use them for SAT solving
+\item CPU for the CDCL procedure
+\item GPU for clause exchange between threads
 \end{itemize}
 \end{frame}
 
 \begin{frame}
 \frametitle{Clause exchange}
 \begin{itemize}
+\item Portfolio approach: multiple CPU threads running concurrently
+\item They share clauses
 \item Sharing too many clauses leads to a slowdown
 \item We need to identify good clause and only share those
 \item Some state-of-the-art solvers share only clauses with small size or lbd
-\end{itemize}
-\end{frame}
-
-\begin{frame}
-\frametitle{Our approach}
-\begin{itemize}
-\item Good clauses are used, in propagation or in conflict analysis
-\item Clauses that have been used are more likely to be used again
-\item Identify clauses which would have been used recently, import those
-\end{itemize}
-\end{frame}
-
-\begin{frame}
-\frametitle{Identifying clauses which would have been used}
-\begin{itemize}
-\item SAT solvers perform propagation until completion, or they reach a conflict
-\item Consider assignments where unit propagation completed without conflict
-\item Indentify clauses which would have been used on those (in conflict or implying)
-\end{itemize}
-\end{frame}
-
-\begin{frame}
-\frametitle{Example of used clauses}
-\begin{itemize}
-\item Assume thread completes propagation with: $v_1 \leftarrow F, v_2 \leftarrow F$
-\begin{itemize}
-\item Clause $v_1 \lor v_2 \lor v_3$ would have implied $ v_3 \leftarrow T$
-\item Clause $v_1 \lor v_2$ would have been in conflict
-\item Clause $\neg v_1 \lor v_2$ would not have told us anything new
-\end{itemize}
-\item We say a clause triggers an assignment if it would have implied something or been in conflict
 \end{itemize}
 \end{frame}
 
@@ -144,7 +108,29 @@
 	\end{tikzpicture}
 }
 \end{figure}
+\end{frame}
 
+\begin{frame}
+\frametitle{Our approach}
+\begin{itemize}
+\item Good clauses are used, in propagation or in conflict analysis
+\item Clauses that have been used are more likely to be used again
+\item Identify clauses which would have been used recently, import those
+\item Consider assignments where unit propagation completed without conflict
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Example of used clauses}
+\begin{itemize}
+\item Assume thread completes propagation with: $v_1 \leftarrow F, v_2 \leftarrow F$
+\begin{itemize}
+\item Clause $v_1 \lor v_2 \lor v_3$ would have propagated $ v_3 \leftarrow T$
+\item Clause $v_1 \lor v_2$ would have been in conflict
+\item Clause $\neg v_1 \lor v_2$ would not have told us anything new
+\end{itemize}
+\item We say a clause triggers an assignment if it would have propagated a literal or been in conflict
+\end{itemize}
 \end{frame}
 
 \begin{frame}
@@ -166,20 +152,24 @@ isTrue & 10 & 00 \\
 \end{frame}
 
 \begin{frame}
-\frametitle{Testing a clause on 32 assignments}
+\frametitle{Testing a clause with bitwise operations}
 
-\begin{algorithm}[H]
-\begin{algorithmic}[1]
-    \State $\mathsf{allFalse} \gets [1,\cdots 1]$ \Comment{bit-vector of size $k$ with each bit initialised to 1}
-    \State $\mathsf{oneUndef} \gets [0, \cdots, 0]$ \Comment{bit-vector of size $k$ with each bit initialised to 0}
-    \For {$\ell \in \mathsf{cl}$}
-        \State $\mathsf{oneUndef} \gets (\mathsf{allFalse} \& \isUndef(\bm{\mathcal{A}}(\ell))) \mid  (\mathsf{oneUndef} \& \isFalse(\bm{\mathcal{A}}(\ell)))$
-        \State $\mathsf{allFalse} \gets \mathsf{allFalse} \& \isFalse(\bm{\mathcal{A}}(\ell))$
-    \EndFor
-    \State  $\mathsf{res} \gets \mathsf{oneUndef} \mid  \mathsf{allFalse}$
-    \State \Return $\mathsf{res}$
-\end{algorithmic}
-\end{algorithm}
+Clause: $v_1 \lor v_2$, 4 assignments
+\begin{center}
+\begin{tabular}{ | c | c | c | c |}
+\hline
+variable & values & allFalse & oneUndef \\ 
+\hline
+ & & 1111 & 0000 \\
+$v_1$ & TFUU & 0100 & 0011 \\  
+$v_2$ & FFFU & 0100 & 0010 \\  
+\hline
+\end{tabular}
+\end{center}
+Answer: 0110, the clause triggers on the second and third assignments
+
+
+All clauses can be tested independantly from each other, so can be done on the GPU
 
 \end{frame}
 
@@ -206,17 +196,7 @@ pooled assignment & \{T, U \} & \{F\} & \{U, F\}\\
 \hline
 \end{tabular}
 \end{center}
-\end{frame}
 
-\begin{frame}
-\frametitle{Clause triggering a pooled assignment}
-\begin{definition}
-	A clause $\mathsf{cl}$ of size s triggers on an pooled assignment $P$ if both of the following conditions hold true:
-	\begin{enumerate}
-		\item For each literal $\ell$ in $\mathsf{cl}$, $P(\ell) \cap \{U,F\} \neq \emptyset$
-		\item For at least s - 1 literals $\ell \in \mathsf{cl}$, $F \in P(\ell)$
-	\end{enumerate}
-\end{definition}
 If a clause does not trigger on a pooled assignment, it does not trigger on any of the associated assignments
 \end{frame}
 
@@ -238,10 +218,12 @@ canBeUndef & 11 & 11 \\
 \end{center}
 
 With this representation, we can test a clause on up to 32 pooled assignments at once.
+All clauses can be tested independantly from each other, so can be done on the GPU
+
 \end{frame}
 
 \begin{frame}
-\frametitle{overall clause testing}
+\frametitle{Overall clause testing}
 \includegraphics[width=\textwidth]{clauseTest.png}
 \begin{itemize}
 \item Blue: positive tests
@@ -254,9 +236,13 @@ With this representation, we can test a clause on up to 32 pooled assignments at
 \frametitle{Comparison with glucose-syrup}
 \begin{figure}[h]
 	\includegraphics[width=\textwidth]{cactusplot_syrup_vs_syrup_gpu}
-	\caption{glucose-syrup vs glucose-syrup + GpuShareSat. glucose-syrup solved 124 SAT and 127 UNSAT instances. glucose-syrup-gpu solved 132 SAT and 131 UNSAT instances.  }
+	\caption{glucose-syrup vs glucose-syrup + GpuShareSat.}
 	\label{cactus:syrup}
 \end{figure}
+\begin{itemize}
+\item glucose-syrup solved 251 instances
+\item glucose-syrup + GpuShareSat solved 263 instances
+\end{itemize}
 \end{frame}
 
 \begin{frame}
@@ -268,8 +254,18 @@ With this representation, we can test a clause on up to 32 pooled assignments at
 	\label{cactus:relaxed}
 \end{figure}
 \begin{itemize}
+\item P-MCOMSPS-STR solved 276, Relaxed\_LCMDCBDL\_newTech + GpuShareSat solved 296
 \item P-MCOMSPS-STR came first in SAT 2020 parallel competition
 \item Relaxed\_LCMDCBDL\_newTech came third in SAT 2020 single threaded competition
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Conclusion}
+\begin{itemize}
+\item Implemented as a library, at \url{https://github.com/nicolasprevot/GpuShareSat}
+\item Designed to make it easy to use from any solver
+\item You are encouraged to add it to your solver
 \end{itemize}
 \end{frame}
 
